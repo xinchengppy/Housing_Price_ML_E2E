@@ -1,0 +1,99 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: 'projects/housing-price-ml-e2e/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+          service_account: 'housing-price-ml-service@housing-price-ml-e2e.iam.gserviceaccount.com'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker --quiet
+
+      # Build and push housing-api image
+      - name: Build and Push housing-api
+        run: |
+          IMAGE_TAG=${GITHUB_SHA}
+          GCR_HOST=gcr.io
+          PROJECT_ID=housing-price-ml-e2e
+          IMAGE_NAME=housing-api
+
+          docker build -t $GCR_HOST/$PROJECT_ID/$IMAGE_NAME:$IMAGE_TAG -f Dockerfile .
+          docker push $GCR_HOST/$PROJECT_ID/$IMAGE_NAME:$IMAGE_TAG
+
+          docker tag $GCR_HOST/$PROJECT_ID/$IMAGE_NAME:$IMAGE_TAG $GCR_HOST/$PROJECT_ID/$IMAGE_NAME:latest
+          docker push $GCR_HOST/$PROJECT_ID/$IMAGE_NAME:latest
+
+      # Build and push housing-streamlit image
+      - name: Build and Push housing-streamlit
+        run: |
+          IMAGE_TAG=${GITHUB_SHA}
+          GCR_HOST=gcr.io
+          PROJECT_ID=housing-price-ml-e2e
+          IMAGE_NAME=housing-streamlit
+
+          docker build -t $GCR_HOST/$PROJECT_ID/$IMAGE_NAME:$IMAGE_TAG -f Dockerfile.streamlit .
+          docker push $GCR_HOST/$PROJECT_ID/$IMAGE_NAME:$IMAGE_TAG
+
+          docker tag $GCR_HOST/$PROJECT_ID/$IMAGE_NAME:$IMAGE_TAG $GCR_HOST/$PROJECT_ID/$IMAGE_NAME:latest
+          docker push $GCR_HOST/$PROJECT_ID/$IMAGE_NAME:latest
+
+      # Deploy to Cloud Run - API
+      - name: Deploy housing-api to Cloud Run
+        run: |
+          IMAGE_TAG=${GITHUB_SHA}
+          GCR_HOST=gcr.io
+          PROJECT_ID=housing-price-ml-e2e
+          IMAGE_NAME=housing-api
+
+          gcloud run deploy housing-api \
+            --image $GCR_HOST/$PROJECT_ID/$IMAGE_NAME:$IMAGE_TAG \
+            --platform managed \
+            --region us-central1 \
+            --service-account housing-price-ml-service@housing-price-ml-e2e.iam.gserviceaccount.com \
+            --set-env-vars GCS_BUCKET=housing-price-ml-e2e-xcluo \
+            --allow-unauthenticated
+
+      # Deploy to Cloud Run - Streamlit
+      - name: Deploy housing-streamlit to Cloud Run
+        run: |
+          IMAGE_TAG=${GITHUB_SHA}
+          GCR_HOST=gcr.io
+          PROJECT_ID=housing-price-ml-e2e
+          IMAGE_NAME=housing-streamlit
+
+          gcloud run deploy housing-streamlit \
+            --image $GCR_HOST/$PROJECT_ID/$IMAGE_NAME:$IMAGE_TAG \
+            --platform managed \
+            --region us-central1 \
+            --set-env-vars API_URL=https://housing-api-abc123.run.app/predict \
+            --set-env-vars GCS_BUCKET=housing-price-ml-e2e-xcluo \
+            --allow-unauthenticated
+
+      - name: Deploy housing-api-service
+        run: |
+          aws ecs update-service \
+            --cluster housing-api-cluster-ecs \
+            --service housing-api-service \
+            --force-new-deployment
+
+      # Deploy to ECS - Streamlit
+      - name: Deploy housing-streamlit-service
+        run: |
+          aws ecs update-service \
+            --cluster housing-api-cluster-ecs \
+            --service housing-streamlit-service \
+            --force-new-deployment

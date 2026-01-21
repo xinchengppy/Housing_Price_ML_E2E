@@ -48,12 +48,12 @@ else:
 # App
 # ----------------------------
 # Instantiates the FastAPI app.
-app = FastAPI(title="Housing Regression API")
+app = FastAPI(title="Housing Price Regression API")
 
 # / → simple landing endpoint to confirm API is alive.
 @app.get("/")
 def root():
-    return {"message": "Housing Regression API is running 🚀"}
+    return {"message": "Housing Price Regression API is running 🚀"}
 
 # /health → checks if model exists, returns status info (like expected feature count).
 @app.get("/health")

@@ -1,0 +1,16 @@
+data/
+logs/
+models/
+.venv/
+.git/
+*.log
+__pycache__/
+.pytest_cache/
+notebooks/
+.DS_Store
+*.ipynb
+mlruns/
+.python-version
+*.md
+LICENSE
+

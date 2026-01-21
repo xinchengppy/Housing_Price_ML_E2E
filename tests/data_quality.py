@@ -61,7 +61,7 @@ def validate_data(path: str):
 
     print(f"\n{path}: {passed}/{total} checks passed")
     if failed:
-        print("❌ Failed expectations:")
+        print("Failed expectations:")
         for r in results["results"]:
             if not r["success"]:
                 config = r["expectation_config"]
@@ -78,7 +78,7 @@ def validate_data(path: str):
                     print(f"    Unexpected count: {result['unexpected_count']}/{result['element_count']}")
         sys.exit(1)
     else:
-        print("✅ All checks passed!")
+        print("All checks passed!")
 
 if __name__ == "__main__":
     for split in ["data/raw/train.csv", "data/raw/eval.csv", "data/raw/holdout.csv"]:
