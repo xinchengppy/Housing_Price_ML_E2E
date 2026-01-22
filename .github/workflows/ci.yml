@@ -67,6 +67,12 @@ jobs:
             --set-env-vars GCS_BUCKET=housing-price-ml-e2e-xcluo \
             --allow-unauthenticated
 
+      - name: Get API URL
+        id: api-url
+        run: |
+          API_URL=$(gcloud run services describe housing-api --region=us-central1 --project=housing-price-ml-e2e --format="value(status.url)")
+          echo "api_url=$API_URL" >> $GITHUB_OUTPUT
+
       # Deploy to Cloud Run - Streamlit
       - name: Deploy housing-streamlit to Cloud Run
         run: |
@@ -79,21 +85,6 @@ jobs:
             --image $GCR_HOST/$PROJECT_ID/$IMAGE_NAME:$IMAGE_TAG \
             --platform managed \
             --region us-central1 \
-            --set-env-vars API_URL=https://housing-api-abc123.run.app/predict \
+            --set-env-vars API_URL=${{ steps.api-url.outputs.api_url }}/predict \
             --set-env-vars GCS_BUCKET=housing-price-ml-e2e-xcluo \
             --allow-unauthenticated
-
-      - name: Deploy housing-api-service
-        run: |
-          aws ecs update-service \
-            --cluster housing-api-cluster-ecs \
-            --service housing-api-service \
-            --force-new-deployment
-
-      # Deploy to ECS - Streamlit
-      - name: Deploy housing-streamlit-service
-        run: |
-          aws ecs update-service \
-            --cluster housing-api-cluster-ecs \
-            --service housing-streamlit-service \
-            --force-new-deployment
