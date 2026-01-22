@@ -62,7 +62,6 @@ jobs:
             --min-instances=1 \ 
             --memory=2Gi \
             --cpu=2 \
-            --max-request-size=100M \
             --allow-unauthenticated
 
       - name: Get API URL # Retrieve the URL of the deployed housing-api service
@@ -82,6 +81,5 @@ jobs:
             --min-instances=1 \
             --memory=2Gi \
             --cpu=2 \
-            --max-request-size=100M \
             --allow-unauthenticated
 
