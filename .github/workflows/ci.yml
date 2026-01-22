@@ -93,6 +93,6 @@ jobs:
             --image $AR_HOST/$PROJECT_ID/$REPO_NAME/$IMAGE_NAME:$IMAGE_TAG \
             --platform managed \
             --region us-central1 \
-            --set-env-vars API_URL=${{ steps.api-url.outputs.api_url }}/predict \
-            --set-env-vars GCS_BUCKET=housing-price-ml-e2e-xcluo \
+            --service-account housing-price-ml-service@housing-price-ml-e2e.iam.gserviceaccount.com \
+            --set-env-vars API_URL=${{ steps.api-url.outputs.api_url }}/predict,GCS_BUCKET=housing-price-ml-e2e-xcluo \
             --allow-unauthenticated
