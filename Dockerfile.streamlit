@@ -1,7 +1,7 @@
 # Dockerfile.streamlit
 # Having Separate Dockerfiles for UI and FastAPI avoids mixing UI logic with backend logic.
 
-# makes builds work across different architectures (
+# makes builds work across different architectures
 FROM --platform=$BUILDPLATFORM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
@@ -15,22 +15,24 @@ RUN pip install --no-cache-dir uv \
 # Copy the app (and data needed by the app)
 COPY . .
 
-# Streamlit config
-ENV STREAMLIT_SERVER_PORT=8501 \
-    STREAMLIT_SERVER_ADDRESS=0.0.0.0 \
+# Cloud Run uses PORT environment variable (default 8080)
+# Override Streamlit's default port with Cloud Run's PORT
+ENV PORT=8080
+EXPOSE 8080
+
+# Streamlit config - note we'll override port in CMD
+ENV STREAMLIT_SERVER_ADDRESS=0.0.0.0 \
     STREAMLIT_SERVER_BASEURLPATH=/dashboard \
     STREAMLIT_BROWSER_GATHERUSAGESTATS=false
 
-# Default API_URL (override in docker run / ECS)
+# API_URL will be set by Cloud Run deployment (from GitHub Actions)
 ENV API_URL=http://localhost:8000/predict
 
-EXPOSE 8501
-
-# Make absolutely sure Streamlit is the thing that starts
-ENTRYPOINT ["streamlit", "run", "app.py"]
-CMD ["--server.port=8501", "--server.address=0.0.0.0", "--server.baseUrlPath=/dashboard"]
+# Use shell form to allow $PORT variable expansion
+ENTRYPOINT ["sh", "-c"]
+CMD ["streamlit run app.py --server.port=$PORT --server.address=0.0.0.0 --server.baseUrlPath=/dashboard"]
 
 
 # FastAPI container: lightweight, only needs Python + Uvicorn + your code.
 # Streamlit container: interactive web app, needs Streamlit configuration and a link to the API.
-# Streamlit has more ENV config because it’s UI-focused. FastAPI just runs a server.
+# Streamlit has more ENV config because it's UI-focused. FastAPI just runs a server.

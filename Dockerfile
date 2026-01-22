@@ -15,7 +15,8 @@ RUN uv sync --frozen --no-dev
 COPY . .
 
 # Expose FastAPI default port
-EXPOSE 8000
+ENV PORT=8080
+EXPOSE 8080
 
 # Command to run API with Uvicorn
-CMD ["uv", "run", "uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD uv run uvicorn src.api.main:app --host 0.0.0.0 --port $PORT
