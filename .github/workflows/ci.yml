@@ -59,7 +59,6 @@ jobs:
             --region ${{ env.REGION }} \
             --service-account housing-price-ml-service@housing-price-ml-e2e.iam.gserviceaccount.com \
             --set-env-vars GCS_BUCKET=${{ env.GCS_BUCKET }} \
-            --min-instances=1 \ 
             --memory=2Gi \
             --cpu=2 \
             --allow-unauthenticated
