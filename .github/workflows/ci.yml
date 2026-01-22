@@ -2,19 +2,18 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main ]  # when code is pushed to main branch, trigger the workflow
 
 permissions:
-  id-token: write
-  contents: read
+  id-token: write   # 获取 OIDC token 用于 Workload Identity
+  contents: read    # 读取代码
 
 env:
-  AR_HOST: europe-west1-docker.pkg.dev
-  PROJECT_ID: housing-price-ml-e2e
-  REPO_NAME: housing-price-ml-e2e
-  REGION: europe-west1
-  GCS_BUCKET: housing-price-ml-e2e-xcluo
-
+  AR_HOST: europe-west1-docker.pkg.dev  # Artifact Registry address
+  PROJECT_ID: housing-price-ml-e2e      # GCP project ID
+  REPO_NAME: housing-price-ml-e2e       # Artifact Registry warehouse name
+  REGION: europe-west1                  # Cloud Run deployment region
+  GCS_BUCKET: housing-price-ml-e2e-xcluo # GCS bucket name
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -22,7 +21,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Authenticate to Google Cloud
+      - name: Authenticate to Google Cloud # Authenticate using Workload Identity Federation
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: 'projects/65985976686/locations/global/workloadIdentityPools/github-pool/providers/github-actions'
@@ -31,10 +30,10 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Configure Docker
-        run: gcloud auth configure-docker ${{ env.AR_HOST }} --quiet
+      - name: Configure Docker # Configure Docker to use Google Cloud Artifact Registry
+        run: gcloud auth configure-docker ${{ env.AR_HOST }} --quiet 
 
-      - name: Build and Push housing-api
+      - name: Build and Push housing-api # Build and push housing-api Docker image
         run: |
           IMAGE_TAG=${GITHUB_SHA}
           docker build -t ${{ env.AR_HOST }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/housing-api:$IMAGE_TAG -f Dockerfile .
@@ -43,7 +42,7 @@ jobs:
                      ${{ env.AR_HOST }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/housing-api:latest
           docker push ${{ env.AR_HOST }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/housing-api:latest
 
-      - name: Build and Push housing-streamlit
+      - name: Build and Push housing-streamlit # Build and push housing-streamlit Docker image
         run: |
           IMAGE_TAG=${GITHUB_SHA}
           docker build -t ${{ env.AR_HOST }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/housing-streamlit:$IMAGE_TAG -f Dockerfile.streamlit .
@@ -52,7 +51,7 @@ jobs:
                      ${{ env.AR_HOST }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/housing-streamlit:latest
           docker push ${{ env.AR_HOST }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/housing-streamlit:latest
 
-      - name: Deploy housing-api to Cloud Run
+      - name: Deploy housing-api to Cloud Run # Deploy housing-api to Cloud Run
         run: |
           gcloud run deploy housing-api \
             --image ${{ env.AR_HOST }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/housing-api:${GITHUB_SHA} \
@@ -60,18 +59,19 @@ jobs:
             --region ${{ env.REGION }} \
             --service-account housing-price-ml-service@housing-price-ml-e2e.iam.gserviceaccount.com \
             --set-env-vars GCS_BUCKET=${{ env.GCS_BUCKET }} \
-            --min-instances=1 \
+            --min-instances=1 \ 
             --memory=2Gi \
             --cpu=2 \
+            --max-request-size=100M \
             --allow-unauthenticated
 
-      - name: Get API URL
+      - name: Get API URL # Retrieve the URL of the deployed housing-api service
         id: api-url
         run: |
           API_URL=$(gcloud run services describe housing-api --region=${{ env.REGION }} --project=${{ env.PROJECT_ID }} --format="value(status.url)")
           echo "api_url=$API_URL" >> $GITHUB_OUTPUT
 
-      - name: Deploy housing-streamlit to Cloud Run
+      - name: Deploy housing-streamlit to Cloud Run # Deploy housing-streamlit to Cloud Run with API URL
         run: |
           gcloud run deploy housing-streamlit \
             --image ${{ env.AR_HOST }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/housing-streamlit:${GITHUB_SHA} \
@@ -82,4 +82,6 @@ jobs:
             --min-instances=1 \
             --memory=2Gi \
             --cpu=2 \
+            --max-request-size=100M \
             --allow-unauthenticated
+
