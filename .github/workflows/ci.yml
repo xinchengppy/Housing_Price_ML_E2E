@@ -8,6 +8,13 @@ permissions:
   id-token: write
   contents: read
 
+env:
+  AR_HOST: us-central1-docker.pkg.dev
+  PROJECT_ID: housing-price-ml-e2e
+  REPO_NAME: housing-price-ml-e2e
+  REGION: europe-west1
+  GCS_BUCKET: housing-price-ml-e2e-xcluo
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -25,74 +32,54 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
 
       - name: Configure Docker
-        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+        run: gcloud auth configure-docker ${{ env.AR_HOST }} --quiet
 
-      # Build and push housing-api image
       - name: Build and Push housing-api
         run: |
           IMAGE_TAG=${GITHUB_SHA}
-          AR_HOST=us-central1-docker.pkg.dev
-          PROJECT_ID=housing-price-ml-e2e
-          REPO_NAME=housing-price-ml-e2e
-          IMAGE_NAME=housing-api
+          docker build -t ${{ env.AR_HOST }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/housing-api:$IMAGE_TAG -f Dockerfile .
+          docker push ${{ env.AR_HOST }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/housing-api:$IMAGE_TAG
+          docker tag ${{ env.AR_HOST }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/housing-api:$IMAGE_TAG \
+                     ${{ env.AR_HOST }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/housing-api:latest
+          docker push ${{ env.AR_HOST }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/housing-api:latest
 
-          docker build -t $AR_HOST/$PROJECT_ID/$REPO_NAME/$IMAGE_NAME:$IMAGE_TAG -f Dockerfile .
-          docker push $AR_HOST/$PROJECT_ID/$REPO_NAME/$IMAGE_NAME:$IMAGE_TAG
-
-          docker tag $AR_HOST/$PROJECT_ID/$REPO_NAME/$IMAGE_NAME:$IMAGE_TAG $AR_HOST/$PROJECT_ID/$REPO_NAME/$IMAGE_NAME:latest
-          docker push $AR_HOST/$PROJECT_ID/$REPO_NAME/$IMAGE_NAME:latest
-
-      # Build and push housing-streamlit image
       - name: Build and Push housing-streamlit
         run: |
           IMAGE_TAG=${GITHUB_SHA}
-          AR_HOST=us-central1-docker.pkg.dev
-          PROJECT_ID=housing-price-ml-e2e
-          REPO_NAME=housing-price-ml-e2e
-          IMAGE_NAME=housing-streamlit
+          docker build -t ${{ env.AR_HOST }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/housing-streamlit:$IMAGE_TAG -f Dockerfile.streamlit .
+          docker push ${{ env.AR_HOST }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/housing-streamlit:$IMAGE_TAG
+          docker tag ${{ env.AR_HOST }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/housing-streamlit:$IMAGE_TAG \
+                     ${{ env.AR_HOST }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/housing-streamlit:latest
+          docker push ${{ env.AR_HOST }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/housing-streamlit:latest
 
-          docker build -t $AR_HOST/$PROJECT_ID/$REPO_NAME/$IMAGE_NAME:$IMAGE_TAG -f Dockerfile.streamlit .
-          docker push $AR_HOST/$PROJECT_ID/$REPO_NAME/$IMAGE_NAME:$IMAGE_TAG
-
-          docker tag $AR_HOST/$PROJECT_ID/$REPO_NAME/$IMAGE_NAME:$IMAGE_TAG $AR_HOST/$PROJECT_ID/$REPO_NAME/$IMAGE_NAME:latest
-          docker push $AR_HOST/$PROJECT_ID/$REPO_NAME/$IMAGE_NAME:latest
-
-      # Deploy to Cloud Run - API
       - name: Deploy housing-api to Cloud Run
         run: |
-          IMAGE_TAG=${GITHUB_SHA}
-          AR_HOST=us-central1-docker.pkg.dev
-          PROJECT_ID=housing-price-ml-e2e
-          REPO_NAME=housing-price-ml-e2e
-          IMAGE_NAME=housing-api
-
           gcloud run deploy housing-api \
-            --image $AR_HOST/$PROJECT_ID/$REPO_NAME/$IMAGE_NAME:$IMAGE_TAG \
+            --image ${{ env.AR_HOST }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/housing-api:${GITHUB_SHA} \
             --platform managed \
-            --region us-central1 \
+            --region ${{ env.REGION }} \
             --service-account housing-price-ml-service@housing-price-ml-e2e.iam.gserviceaccount.com \
-            --set-env-vars GCS_BUCKET=housing-price-ml-e2e-xcluo \
+            --set-env-vars GCS_BUCKET=${{ env.GCS_BUCKET }} \
+            --min-instances=1 \
+            --memory=2Gi \
+            --cpu=2 \
             --allow-unauthenticated
 
       - name: Get API URL
         id: api-url
         run: |
-          API_URL=$(gcloud run services describe housing-api --region=us-central1 --project=housing-price-ml-e2e --format="value(status.url)")
+          API_URL=$(gcloud run services describe housing-api --region=${{ env.REGION }} --project=${{ env.PROJECT_ID }} --format="value(status.url)")
           echo "api_url=$API_URL" >> $GITHUB_OUTPUT
 
-      # Deploy to Cloud Run - Streamlit
       - name: Deploy housing-streamlit to Cloud Run
         run: |
-          IMAGE_TAG=${GITHUB_SHA}
-          AR_HOST=us-central1-docker.pkg.dev
-          PROJECT_ID=housing-price-ml-e2e
-          REPO_NAME=housing-price-ml-e2e
-          IMAGE_NAME=housing-streamlit
-
           gcloud run deploy housing-streamlit \
-            --image $AR_HOST/$PROJECT_ID/$REPO_NAME/$IMAGE_NAME:$IMAGE_TAG \
+            --image ${{ env.AR_HOST }}/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/housing-streamlit:${GITHUB_SHA} \
             --platform managed \
-            --region us-central1 \
+            --region ${{ env.REGION }} \
             --service-account housing-price-ml-service@housing-price-ml-e2e.iam.gserviceaccount.com \
-            --set-env-vars API_URL=${{ steps.api-url.outputs.api_url }}/predict,GCS_BUCKET=housing-price-ml-e2e-xcluo \
+            --set-env-vars API_URL=${{ steps.api-url.outputs.api_url }}/predict,GCS_BUCKET=${{ env.GCS_BUCKET }} \
+            --min-instances=1 \
+            --memory=2Gi \
+            --cpu=2 \
             --allow-unauthenticated
