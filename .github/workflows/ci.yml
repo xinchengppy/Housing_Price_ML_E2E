@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 env:
-  AR_HOST: us-central1-docker.pkg.dev
+  AR_HOST: europe-west1-docker.pkg.dev
   PROJECT_ID: housing-price-ml-e2e
   REPO_NAME: housing-price-ml-e2e
   REGION: europe-west1
