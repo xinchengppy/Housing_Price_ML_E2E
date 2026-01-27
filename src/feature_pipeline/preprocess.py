@@ -129,7 +129,6 @@ def clean_and_merge(df: pd.DataFrame, metros_path: Optional[str] = "data/raw/usm
     return df
 
 
-
 def drop_duplicates(df: pd.DataFrame) -> pd.DataFrame:
     """Drop exact duplicates while keeping different dates/years."""
     try:
