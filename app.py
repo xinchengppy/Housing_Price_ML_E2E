@@ -188,18 +188,12 @@ if run_prediction:
 
         try:
             with st.spinner("🔮 Making predictions..."):
-                resp = requests.post(API_URL, json=payload, timeout=60)
-                resp.raise_for_status()
-                out = resp.json()
-                preds = out.get("predictions", [])
-                actuals = out.get("actuals", None)
+                preds = batch_predict(payload, batch_size=100)
+                actuals = None  # Assuming API doesn't return actuals for predictions
 
                 view = disp_df.loc[idx, ["date", "region", "actual_price"]].copy()
                 view = view.sort_values("date")
                 view["prediction"] = pd.Series(preds, index=view.index).astype(float)
-
-                if actuals is not None and len(actuals) == len(view):
-                    view["actual_price"] = pd.Series(actuals, index=view.index).astype(float)
 
             # ============================
             # Metrics Cards
