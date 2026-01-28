@@ -189,11 +189,12 @@ if run_prediction:
         try:
             with st.spinner("🔮 Making predictions..."):
                 preds = batch_predict(payload, batch_size=100)
-                actuals = None  # Assuming API doesn't return actuals for predictions
 
                 view = disp_df.loc[idx, ["date", "region", "actual_price"]].copy()
-                view = view.sort_values("date")
+                # ⚠️ IMPORTANT: Do NOT sort here - it misaligns with predictions!
                 view["prediction"] = pd.Series(preds, index=view.index).astype(float)
+                # NOW sort for display
+                view = view.sort_values("date")
 
             # ============================
             # Metrics Cards
